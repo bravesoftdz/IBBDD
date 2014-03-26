@@ -1,5 +1,5 @@
 Type
-	archivo = file of integer;
+	archivo = File of integer;
 procedure menu(var op:integer);
 begin
 	writeln('Elija una opción: ');
@@ -24,36 +24,37 @@ begin
 			else write(nuevo, n:6); 
 			cont:=cont+1;
 			end;
+    end;
 	close(a);
 	close(nuevo);
 end;
 procedure opcion2(var a:archivo, var p:Text, var ne:Text);
 var
-	n, cont, cont2, pos, neg:integer;
+    num, conta, conta2, pos, neg:integer;
 begin
 	reset(a);
 	rewrite(p);
 	rewrite(ne);
 	pos:=0;
 	neg:=0;
-	cont:=0;
-	cont2:=0;
+	conta:=0;
+	conta2:=0;
 	while (not eof(a)) do begin
-		if (cont=12) then cont:=0;
-		if (cont2=12) then cont2:=0;
-		while (not eof(a) and cont<12 and cont2<12) do begin
-			read(a, n);
-			if (n>=0) then begin
+		if (conta=12) then conta:=0;
+		if (conta2=12) then conta2:=0;
+		while (not eof(a) and conta<12 and conta2<12) do begin
+			read(a, num);
+			if (num>=0) then begin
 				pos:=pos+1;
-				if (cont=11) then writeln(p, n:6)
-				else write(p, n:6); 
-				cont:=cont+1;
+				if (conta=11) then writeln(p, num:6)
+				else write(p, num:6);
+				conta:=conta+1;
 				end
 			else begin
 				neg:=neg+1;
-				if (cont2=11) then writeln(ne, n:6)
-				else write(ne, n:6);
-				cont2:=cont2+1;
+				if (conta2=11) then writeln(ne, num:6)
+				else write(ne, num:6);
+				conta2:=conta2+1;
 			end;
 		end;
 	end;
@@ -99,7 +100,7 @@ begin
 	close(p);
 	close(imp);
 end;
-procedure opcion3(var a:archivo, var pp:Text, var pn:Text, var ip:Text, var in:Text);
+procedure opcion3(var a:archivo, var pp:Text, var pn:Text, var ip:Text, var ine:Text);
 var
 	n, cont, cont2, cont3, cont4, par_pos, par_neg, impar_pos, impar_neg:integer;
 begin
@@ -107,7 +108,7 @@ begin
 	rewrite(pp);
 	rewrite(pn);
 	rewrite(ip);
-	rewrite(in);
+	rewrite(ine);
 	par_pos:=0;
 	impar_pos:=0;
 	par_neg:=0;
@@ -123,7 +124,7 @@ begin
 		if (cont4=12) then cont4:=0;
 		while (not eof(a) and cont<12 and cont2<12 and cont3<12 and cont4<12) do begin
 			read(a, n);
-			if (n mod 2=0) then begin
+			if (n mod 2=0) then
 				if (n>=0) then begin
 					par_pos:=par_pos+1;
 					if (cont=11) then writeln(pp, n:6)
@@ -135,8 +136,8 @@ begin
 					if (cont2=11) then writeln(pn, n:6)
 					else write(pn, n:6);
 					cont2:=cont2+1;
-				end
-			else begin
+				end;
+			else
 				if (n>=0) then begin
 					impar_pos:=impar_pos+1;
 					if (cont3=11) then writeln(ip, n:6)
@@ -145,9 +146,10 @@ begin
 					end
 				else begin
 					impar_neg:=impar_neg+1;
-					if (cont4=11) then writeln(in, n:6)
-					else write(in, n:6);
+					if (cont4=11) then writeln(ine, n:6)
+					else write(ine, n:6);
 					cont4:=cont4+1;
+                    end;
 		end;
 	end;
 	writeln('Cantidad de números pares positivos: ', par_pos);
@@ -168,7 +170,7 @@ Var
 Begin
 	n:=0;
 	b:=true;
-	assign(arch,'enteros.txt');
+	assign(arch,'enteros');
 	assign(nue, 'numeros.txt');
 	assign(pos, 'positivos.txt');
 	assign(neg, 'negativos.txt');
@@ -187,4 +189,5 @@ Begin
 			3: opcion3(arch, par, impar);
 			4: opcion4(arch, par_pos, par_neg, impar_pos, impar_neg);
 			5: b:=false;
+            end;
 End.
