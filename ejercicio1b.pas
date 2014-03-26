@@ -160,7 +160,7 @@ begin
 	close(pp);
 	close(pn);
 	close(ip);
-	close(in);
+	close(ine);
 end;
 Var 
 	arch:archivo;
