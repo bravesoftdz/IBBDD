@@ -20,19 +20,19 @@ begin
 	Crear(nombre, apellido, dni, fechanacimiento, P);
 	Insertar(A,P,exito);
 	if (exito) then	writeln('La persona se ha argregado exitosamente. ')
-	else	writeln('En el archivo ya existÌa un registro con el mismo DNI.');
+	else	writeln('En el archivo ya exist√≠a un registro con el mismo DNI.');
 end;
 procedure CargarPersonas(var A:apersonas);
 var
-	opcion:string[5];
+	opcion:char;
 begin
-	writeln('Si desea cargar una nueva persona escriba la "u" y si desea terminar el archivo escriba "d".');
+	writeln('Si desea cargar una nueva persona escriba "1" y si desea terminar el archivo escriba "2".');
 	read(opcion);
-	while (opcion[0]<>'d') do
-	begin
-		while ((opcion[0]<>'u') or (opcion[0]<>'d')) do
+	while (opcion <> '2') do begin
+		while ((opcion<>'1') and (opcion<>'2')) do
 			read(opcion);
-		if (opcion[0] ='u') then	CargarPersona(A);
+		if (opcion ='1') then	CargarPersona(A);
+		read(opcion);
 	end;
 end;
 
@@ -42,5 +42,5 @@ var
 begin
 	CrearArchivo(Archivo, 'registros'); //proceso del UNIT
 	CargarPersonas(Archivo); //proceso del programa
-	Exportar(Archivo, exp, 'exportado.txt')//implementar las dem·s funciones
+	Exportar(Archivo, exp, 'exportado.txt')//implementar las dem√°s funciones
 end.

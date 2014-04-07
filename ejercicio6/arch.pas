@@ -91,7 +91,7 @@ implementation
 		begin
 			read(A.ra.arch,P);
 			A.ra.pos:= A.ra.pos +1;
-			if (P.valido)then //solo escribe en el .txt si es un registro válido
+			if (P.valido)then //solo escribe en el .txt si es un registro vÃ¡lido
 			begin
                 Consultar_nombre(nom, P);
                 Consultar_apellido(ape, P);
@@ -109,7 +109,7 @@ implementation
 	begin
 		if (FileSize(A.lib)>0) then 
 		begin
-			Seek(A.lib, FileSize(A.lib)); //#Hay que ver si FileSize(A.lib) lleva a la posicion de EoF o a la del último elemento
+			Seek(A.lib, FileSize(A.lib)); //#Hay que ver si FileSize(A.lib) lleva a la posicion de EoF o a la del Ãºltimo elemento
 			read(A.lib, pos);
 			Seek(A.ra.arch,pos); //vamos a la posicion libre
 			write(A.ra.arch,P);
@@ -120,9 +120,9 @@ implementation
 	end;
 	procedure Insertar (var A:apersonas; P:tpersona; var exito:boolean);
 	var
-		encontro:boolean;
+		encontro:boolean; T:tpersona;
 	begin
-		Recuperar(A, P, Consultar_dni(P), encontro);
+		Recuperar(A, T, Consultar_dni(P), encontro);
 		resetearArchivos(A);
 		if (not encontro) then //no se encontro por lo tanto debe agregarse
 		begin
@@ -139,18 +139,19 @@ implementation
 		P: tpersona;
 	begin
 		Recuperar(A, P, dni, encontro);
-		if (not encontro) then begin
+		if (encontro) then begin
 			A.ra.pos:=FilePos(A.ra.arch)-1;
 			P.valido:=false;
 			seek(A.ra.arch, A.ra.pos);
 			write(A.ra.arch, P);
 			seek(A.lib, FileSize(A.lib)+1);
 			write(A.lib, A.ra.pos);
+			exito:=true;
 			end
 		else exito:=false;
 		close(A.lib);
 		close(A.ra.arch);
-		
+
 	end;
 	procedure Modificar (var A:apersonas; nom:String[20]; ape:String[20]; dni:Longword; fecnac:Longword; var exito:boolean);
 	var
@@ -184,6 +185,6 @@ implementation
         end;
 		close(nuevo);
 		close(A.ra.arch);
-		A.ra.arch:= nuevo;   //# Esto no sé si se puede hacer
+		A.ra.arch:= nuevo;   //# Esto no sÃ© si se puede hacer
 	end;
 End.
