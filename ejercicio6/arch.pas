@@ -2,12 +2,17 @@ UNIT arch;
 interface
 	uses sysutils;
 	type
+        Fecha = record
+              dia:Longword;
+              mes:Longword;
+              ano:Longword;
+        end;
         tpersona = Packed Record
 				valido:boolean;
                 DNI:Longword;
 				Apellido:String;
 				Nombre:String;
-				FechaNac:Longword;
+				FechaNac:Fecha;
 		end;
 		archivo = File of tpersona;
 		libres = File of integer;
@@ -24,24 +29,26 @@ interface
   	procedure Consultar_nombre(var nom:String; P:tpersona);                 //pone en nom el nombre del registro P;
    	procedure Consultar_apellido(var ape:String; P:tpersona);               //pone en ape el apellido del registro P;
   	function Consultar_dni(P:tpersona):Longword;                                //devuelve el dni del registro P;
-   	function Consultar_fechanac(P:tpersona):Longword;                           //devuelve la fecha de nacimiento del registro P;
+   	function Consultar_fechanac_dia(P:tpersona):Longword;
+    function Consultar_fechanac_mes(P:tpersona):Longword;
+    function Consultar_fechanac_ano(P:tpersona):Longword;
   //De los archivos:
     procedure CrearArchivo(var A:apersonas; nombre:String; nomlib:String);                 //Inicializa y asigna los archivos, recibe el nombre del archivo de registros;
     procedure Abrir (var A:apersonas; nomarch:String; nomlib:String);
     procedure DevolverPersona (A:apersonas; var P:tpersona);
 	procedure Cargar(var A:apersonas);                                          //Carga un nuevo registro al final del archivo de registros;
 	procedure Primero (var A:apersonas; var exito:boolean);                     //Se posiciona en el primer registro del archivo y devuelve si se pudo realizar o no;
-	procedure Siguiente (var A:apersonas; var exito:boolean);                   //Se posiciona en el siguiente registro válido del archivo y devuelve si lo pudo hacer;
+	procedure Siguiente (var A:apersonas; var exito:boolean);                   //Se posiciona en el siguiente registro v�lido del archivo y devuelve si lo pudo hacer;
 	procedure Recuperar (var A:apersonas; dni:Longword; var exito:boolean);     //Se posiciona en el registro con el mismo dni y devuelve si lo pudo realizar;
 	procedure Exportar (var A:apersonas; var arch:Text; nombreTxt:String);  //Exporta el archivo de registros a un nuevo archivo de texto del cual recibe el nombre;
 	procedure Insertar (var A:apersonas; var exito:boolean);                    //Inserta un nuevo registro en algun espacio libre o al final y devuelve si lo pudo hacer;
 	procedure Eliminar (var A:apersonas; dni:Longword; var exito:boolean);      //Elimina el registro con dni indicado y devuelve si lo pudo hacer;
-	procedure Modificar (var A:apersonas; nom:String; ape:String; dni:Longword; fecnac:Longword; var exito:boolean);    //Modifica el registro con mismo dni y devuelve si lo pudo hacer;
-	procedure Respaldar (var A:apersonas);                                      //Crea una nueva versión del archivo sin espacios libres;
+	procedure Modificar (var A:apersonas; nom:String; ape:String; dni:Longword; fecnac_dia:Longword; fecnac_mes:Longword; fecnac_ano:Longword; var exito:boolean);    //Modifica el registro con mismo dni y devuelve si lo pudo hacer;
+	procedure Respaldar (var A:apersonas; nombre:String);                                      //Crea una nueva versi�n del archivo sin espacios libres;
 	procedure Cerrar (var A:apersonas);
 
 implementation
-    procedure Crear(nom:String; ape:String; dnil:Longword; fecnac:Longword; var T:tpersona); // proxlibre??
+    procedure Crear(nom:String; ape:String; dnil:Longword; fecnac_dia:Longword; fecnac_mes:Longword; fecnac_ano:Longword; var T:tpersona); // proxlibre??
 	begin
 		with T do
 		begin
@@ -49,7 +56,9 @@ implementation
 			DNI:= dnil;
 			Apellido:= ape;
 			Nombre:= nom;
-			FechaNac:= fecnac;
+			FechaNac.dia:= fecnac_dia;
+            FechaNac.mes:= fecnac_mes;
+            FechaNac.ano:= fecnac_ano;
 		end;
 	end;
     procedure verActual(var A:apersonas; var P:tpersona);
@@ -71,10 +80,20 @@ implementation
 		if (P.valido) then
 			Consultar_dni:= P.DNI;
 	end;
-	function Consultar_fechanac(P:tpersona):Longword;
+	function Consultar_fechanac_dia(P:tpersona):Longword;
 	begin
 		if (P.valido) then
-			Consultar_fechanac:= P.FechaNac;
+			Consultar_fechanac_dia:= P.FechaNac.dia;
+	end;
+ 	function Consultar_fechanac_mes(P:tpersona):Longword;
+	begin
+		if (P.valido) then
+			Consultar_fechanac_mes:= P.FechaNac.mes;
+	end;
+ 	function Consultar_fechanac_ano(P:tpersona):Longword;
+	begin
+		if (P.valido) then
+			Consultar_fechanac_ano:= P.FechaNac.ano;
 	end;
 	procedure CrearArchivo(var A:apersonas; nombre:String; nomlib:String);
 	begin
@@ -95,7 +114,7 @@ implementation
     procedure CargarPersona(var A:apersonas);
     var
 	   nombre, apellido: String;
-	   dni, fechanacimiento: Longword;
+	   dni, fecnac_dia, fecnac_mes, fecnac_ano: Longword;
     begin
 	   write('Escriba su nombre: ');
 	   readln(nombre);
@@ -103,9 +122,15 @@ implementation
 	   readln(apellido);
 	   write('Escriba su dni: ');
        readln(dni);
-	   write('Escriba su fecha de nacimiento: ');
-       readln(fechanacimiento);
-	   Crear(nombre, apellido, dni, fechanacimiento, A.p);
+	   writeln('Escriba su fecha de nacimiento: ');
+       write('Dia: ');
+       readln(fecnac_dia);
+       write('Mes: ');
+       readln(fecnac_mes);
+       write('A�o: ');
+       readln(fecnac_ano);
+       writeln();
+	   Crear(nombre, apellido, dni, fecnac_dia, fecnac_mes, fecnac_ano, A.p);
     end;
 	procedure Cargar(var A:apersonas);
 	begin
@@ -159,11 +184,11 @@ implementation
 		begin
 			read(A.ra.arch,A.p);
 			A.ra.pos:= A.ra.pos +1;
-			if (A.p.valido)then //solo escribe en el .txt si es un registro vÃ¡lido
+			if (A.p.valido)then //solo escribe en el .txt si es un registro válido
 			begin
                 Consultar_nombre(nom, A.p);
                 Consultar_apellido(ape, A.p);
-                cadena:= 'Nombre: '+nom+ ' Apellido: '+ ape+ ' DNI: '+IntToStr(Consultar_dni(A.p))+ ' Fecha de nacimiento: '+IntToStr(Consultar_fechanac(A.p));
+                cadena:= 'Nombre: '+nom+ ' Apellido: '+ ape+ ' DNI: '+IntToStr(Consultar_dni(A.p))+ ' Fecha de nacimiento: '+IntToStr(Consultar_fechanac_dia(A.p))+'/'+IntToStr(Consultar_fechanac_mes(A.p))+'/'+IntToStr(Consultar_fechanac_ano(A.p));
 				writeln(arch, cadena);
 			end;
 		end;
@@ -175,7 +200,7 @@ implementation
 	begin
 		if (FileSize(A.lib)>0) then 
 		begin
-			Seek(A.lib, FileSize(A.lib)-1); //#Hay que ver si FileSize(A.lib) lleva a la posicion de EoF o a la del Ãºltimo elemento
+			Seek(A.lib, FileSize(A.lib)-1); //#Hay que ver si FileSize(A.lib) lleva a la posicion de EoF o a la del último elemento
 			read(A.lib, pos);
 			Seek(A.ra.arch,pos); //vamos a la posicion libre
 			write(A.ra.arch,A.p);
@@ -217,7 +242,7 @@ implementation
 			end
 		else exito:=false;
 	end;
-	procedure Modificar (var A:apersonas; nom:String; ape:String; dni:Longword; fecnac:Longword; var exito:boolean);
+	procedure Modificar (var A:apersonas; nom:String; ape:String; dni:Longword; fecnac_dia:Longword; fecnac_mes:Longword; fecnac_ano:Longword; var exito:boolean);
 	var
 		encontro:boolean;
 	begin
@@ -225,27 +250,26 @@ implementation
 		Recuperar(A, dni, encontro);
 		if (encontro) then //si se encontro la persona a sobrescribir
 		begin
-			Crear(nom, ape, dni, fecnac, A.p);
+			Crear(nom, ape, dni, fecnac_dia, fecnac_mes, fecnac_ano, A.p);
 			Seek(A.ra.arch, (FilePos(A.ra.arch)-1)); //vuelve a la posicion a sobrescribir
 			write(A.ra.arch, A.p);
 		end;
 		exito:= encontro;
 	end;
-	procedure Respaldar (var A:apersonas);
+	procedure Respaldar (var A:apersonas; nombre:String);
 	var
 		nuevo:archivo;
 		exito:boolean;
 	begin
 		Seek(A.ra.arch,0);
-		assign(nuevo, 'archivoRespaldado');
+        nombre:= nombre + '_respaldado';
+		assign(nuevo, nombre);
 		rewrite(nuevo);
 		while (not EoF(A.ra.arch)) do begin
 			Siguiente(A, exito);
 			if (exito) then write(nuevo, A.p);
         end;
-		//close(nuevo);
-		//close(A.ra.arch);
-		A.ra.arch:= nuevo;   //# Esto no sÃ© si se puede hacer
+		A.ra.arch:= nuevo;   //# Esto no sé si se puede hacer
 	end;
 	procedure Cerrar(var A:apersonas);
 	begin
