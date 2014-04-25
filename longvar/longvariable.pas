@@ -7,6 +7,11 @@ INTERFACE
               FIN_CAMPO = '#';
               FIN_BLOQUE = '*';
          Type
+			 Fecha = record
+				dia:Longword;
+				mes:Longword;
+				ano:Longword;
+			 end;
              tNroBloque = Word;
              tBloque = Array[1..LongBloque] of Byte;
              abPersonas = File;
@@ -15,7 +20,7 @@ INTERFACE
                       DNI: Longword;
                       Apellido: String[20];
                       Nombres: String[20];
-                      FechaNac: Longword;
+                      FechaNac: Fecha;
              end;
              ctlPersonas = Record
                          estado: tEstado;
@@ -55,7 +60,7 @@ IMPLEMENTATION
                         BlockRead(a.arch, a.b, 1);
                         Seek(a.libres, FileSize(a.libres)-1);
                         Read(a.libres, a.libre);
-                        ib:=LongBloque – a.libre+1;
+                        ib:=LongBloque - a.libre+1;
                    end;
               end;
  
@@ -109,11 +114,12 @@ IMPLEMENTATION
                    sx:=a.p.Nombres+FIN_CAMPO;
                    Move(sx[1], a.pe[i], Length(sx));
                    Inc(i, Length(sx));
-                   Str(a.p.FechaNac, a.p.FechaNac);
+                   Str(a.p.FechaNac, sx);
                    sx:=sx+FIN_REGISTRO;
                    Move(sx[1], a.pe[i], Length(sx));
                    Inc(i, Length(sx));
-                   a.ib := a.ib + i;
+                   a.lpe:= i;
+                   //a.ib := a.ib + i; Borrar ya que no sirve
               end;
 
               Procedure EscribirEnBloqueUltimo(var a:ctlPersonas);    // devuelve en a.b el bloque listo para ser escrito
@@ -129,6 +135,13 @@ IMPLEMENTATION
                         i:= i+1;
                         act:= act+1;
                    end;
+                   Move(FIN_REGISTRO, a.b[i], 1);
+                   Move(FIN_BLOQUE, a.b[i+1], 1);
+                   Seek(a.libres,(FileSize(a.arch)-1));
+                   read(a.libres,a.libre);
+                   a.libre:= a.libre - a.lpe;
+                   Seek(a.libres,(FilePos(a.libres)-1));
+                   write(a.libres,a.libre);
               end;
 
               Procedure EscribirEnBloqueNuevo(var a:ctlPersonas);
@@ -139,19 +152,24 @@ IMPLEMENTATION
                         Move(a.pe[i], a.b[i], 1);
                         i:= i+1;
                    end;
+                   Move(FIN_REGISTRO, a.b[i], 1);
+                   Move(FIN_BLOQUE, a.b[i+1], 1);
+                   Seek(a.libres, FileSize(a.libres)));
+                   a.libre:= longbloque-a.lpe-1;
+                   write(a.libres,a.libre);
               end;
 
               Procedure Cargar(var a:ctlPersonas);
               begin
                    if (a.estado <> LE) then    a.estado:= LE;
                    Seek(a.arch, (FileSize(a.arch)-1));
-                   ReadBlock(a.arch, a.b, 1);
+                   BlockRead(a.arch, a.b, 1);
                    Empaquetar(a);
                    if (UltimoBloqueLibre(a)) then
                    begin
                         Seek(a.arch, (FilePos(a.arch)-1)); //vuelve al ultimo bloque a seguir escribiendo
                         EscribirEnBloqueUltimo(a);
-                   end;
+                   end
                    else EscribirEnBloqueNuevo(a);
                    BlockWrite(a.arch, a.b, 1);
               end;
@@ -183,13 +201,20 @@ IMPLEMENTATION
 				if (b) then begin
 					act:=a.ib;					// 'act' es el indice de las posiciones a reacomodar
 					a.ib:=a.ib-Length(sx)-1;		// 'a.ib' es el indice de la posicion donde empieza el registro a eliminar
-					repeat act:=act+1; until (a.b[act] <> FIN_REGISTRO);
+					repeat act:=act+1; until (a.b[act] = FIN_REGISTRO);
+					act:=act+1;
+					{
+					* seek(a.libres, FilePos(a.arch)-1);
+					* read(a.libres, a.libre);
+					* t := LongBloque - a.libre - act;    // calcula la cantidad de bytes para hacer el corrimiento
+					* Move(a.b[act], a.b[a.ib], t);
+					* } 
 					Move (a.b[act], a.b[a.ib], LongBloque-act+1);			// se realiza el corrimiento solapando el registro a borrar
-					while (a.b[act] <> FIN_BLOQUE) do act:=act+1;
+					act:=act-a.ib;
 					BlockWrite(a.arch, a.b, 1);					// se escribe la modificacion en el archivo
 					seek(a.libres, FilePos(a.arch)-1);
 					read(a.libres, a.libre);
-					a.libre:=a.libre+LongBloque-act;		// 'act' se utiliza para calcular la cantidad de bytes libres
+					a.libre:=a.libre+act;		// 'act' se utiliza para calcular la cantidad de bytes libres
 					seek(a.libres, FilePos(a.libres)-1);
 					write(a.libres, a.libre);				// se actualiza el archivo de libres
 				end;
@@ -201,7 +226,8 @@ IMPLEMENTATION
               var
 				sx:String;
 				b:boolean;
-				i, t:word;
+				i, t, checkpointer:word;
+				codigo:integer;
               begin
 				b:=false;
 				Str(dni, sx);
@@ -221,8 +247,10 @@ IMPLEMENTATION
 						end;
 					end;
 				end;
+				checkpointer:= a.ib;
 				if (b) then begin
-					p.DNI:=dni;
+					a.p.DNI:=dni;
+					a.ib:=a.ib+1;
 					i := a.ib;
 					t:=0;
 					while (a.b[a.ib] <> FIN_CAMPO) do begin
@@ -246,8 +274,80 @@ IMPLEMENTATION
 						t:=t+1;
 					end;
 					Move(a.b[i], sx[1], t);
-					{ Aca habria que convertir 'sx' a Longword pasandolo a 'a.p.FechaNac' }
+					Val(sx, a.p.FechaNac, codigo);
 				end;
 				exito:=b;
+				a.ib:= checkpointer;
               end;
+              
+              Procedure DevolverPersona (var a:ctlPersonas; var p:tpersona);
+              Begin
+				p:= a.p;
+			end;
+			
+			Procedure Insertar (var a:ctlPersonas; var exito:boolean);
+			var
+				fin: boolean;
+			Begin
+				Seek(a.libres,0);
+				Empaquetar(a);
+				fin:= false;
+				while ((not fin) and (not EoF(a.libres))) do
+				begin
+					read(a.libres, a.libre);
+					if (a.libre >= a.lpe) then
+					begin
+						fin:= true;
+						Seek(a.libres,(FilePos(a.libres)-1));
+					end;
+				end;
+				if (fin) then
+				begin
+					Seek(a.arch, FilePos(a.libres));
+					BlockRead(a.arch, a.b);
+					Move(a.pe[1], a.b[LongBloque-a.libre], a.lpe);
+					Move(FIN_BLOQUE, a.b[LongBloque-a.libre+a.lpe], 1); //LongBloque-act+a.lpe+1??
+					a.libre:= a.libre-a.lpe;
+					write(a.libres,a.libre);
+				end
+				else	Cargar(a);
+				exito:= true;
+			End.
+			
+			Procedure CrearPersona(var P:tpersona; nom:String[20]; ape:String[20]; dnis:Longword; fecnac_dia:Longword; fecnac_mes:Longword; fecnac_ano:Longword);
+			begin
+				with P do
+				begin
+					Nombres:= nom;
+					Apellido:= ape;
+					DNI:= dnis;
+					with FechaNac do
+					begin
+						dia:=fecnac_dia;
+						mes:=fecnac_mes;
+						ano:=fecnac_ano;
+					end;
+				end;
+			end;
 
+			Procedure Modificar(var a:ctlPersonas; nom:String[20]; ape:String[20]; dni:Longword; fecnac_dia:Longword; fecnac_mes:Longword; fecnac_ano:Longword; var exito:boolean);
+			var
+				x, tamanio:word;
+			begin
+				tamanio:=0;
+				Recuperar(a, dni, exito);
+				Empaquetar(a);
+				tamanio:= a.lpe;
+				if (exito) then
+				begin		
+					CrearPersona(a.p, nom, ape, dni, fecnac_dia, fecnac_mes, fecnac_ano);
+					Empaquetar(a);
+					if(a.lpe<=tamanio) then
+					begin
+						longitudaborrar:= SizeOf(nom)+SizeOf(ape)+SizeOf(fecnac_dia)+SizeOf(fecnac_mes)+SizeOf(fecnac_ano);
+						Move(a.pe[a.lpe-longitudaborrar-1],a.b[a.ib],a.lpe-SizeOf(dni);
+					end
+					else
+						exito:= false; // informar en el programa principal que no se pudo modificar porque el registro a agregar era mas grande que el anterior
+				end;
+			end;
