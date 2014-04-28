@@ -2,25 +2,19 @@ UNIT longvariable;
 INTERFACE
          Const
               LongBloque = 1024;
-              NoHay: tNroBloque = High(tNroBloque);
               FIN_REGISTRO = '@';
               FIN_CAMPO = '#';
               FIN_BLOQUE = '*';
          Type
-			 Fecha = record
-				dia:Longword;
-				mes:Longword;
-				ano:Longword;
-			 end;
              tNroBloque = Word;
              tBloque = Array[1..LongBloque] of Byte;
-             abPersonas = File;
+             abPersonas = File of tBloque;
              tEstado = (C, E, LE);
              tPersona = Record
                       DNI: Longword;
                       Apellido: String[20];
                       Nombres: String[20];
-                      FechaNac: Fecha;
+                      FechaNac: Longword;
              end;
              ctlPersonas = Record
                          estado: tEstado;
@@ -45,9 +39,9 @@ INTERFACE
              Procedure Exportar(var a:ctlPersonas; nom:String);
              Procedure Eliminar(var a:ctlPersonas; dni:Longword; var exito:boolean);
              Procedure Recuperar(var a:ctlPersonas; dni:Longword; var exito:boolean);
-             Procedure Modificar(var a:ctlPersonas; nom:String[20]; ape:String[20]; dni:Longword; fecnac_dia:Longword; fecnac_mes:Longword; fecnac_ano:Longword; var exito:boolean);
+             Procedure Modificar(var a:ctlPersonas; nom:String[20]; ape:String[20]; dni:Longword; fecha:Longword; var exito:boolean);
              Procedure Primero (var a : ctlPersonas ; var exito : boolean);
-             // Falta primitiva Siguiente
+             Procedure Siguiente (var a : ctlPersonas ; var exito : boolean);
              Procedure Respaldar (a:ctlPersonas);
 
 IMPLEMENTATION
@@ -77,28 +71,9 @@ IMPLEMENTATION
  
               Procedure Cerrar(var a: ctlPersonas);
               begin
-                   if (modo=E) then
-                   begin
-                        BlockWrite(a.arch, a.b, 1);
-                        Write(a.libres, alibre);
-                   end;
                    Close(a.arch);
                    Close(a.libres);
                    a.Estado:=C;
-              end;
- 
-              Function Libre(var a: ctlPersonas): tNroBloque;
-              var
-                 encontrado: Boolean = False;
-              begin
-                   Seek(a.libres, 0);
-                   while (not encontrado) and (FilePos(a.libres)<FileSize(a.libres)) do
-                   begin
-                        Read(a.libres, a.libre);
-                        encontrado:=(a.libre>=a.lpe);
-                   end;
-                   if encontrado then Libre:=FilePos(a.libres)-1);
-                   else Libre:= NoHay;
               end;
 
               Function UltimoBloqueLibre(a:ctlPersonas):boolean;
@@ -365,53 +340,90 @@ IMPLEMENTATION
 					end;
 					Move(a.b[i], sx[1], t);
 					Val(sx, a.p.FechaNac, codigo);
+					a.ib:= checkpointer;
 				end;
 				exito:=b;
-				a.ib:= checkpointer;
               end;
 			
 			//Franco
-			Procedure CrearPersona(var P:tpersona; nom:String[20]; ape:String[20]; dnis:Longword; fecnac_dia:Longword; fecnac_mes:Longword; fecnac_ano:Longword);
+			Procedure CrearPersona(var P:tpersona; nom:String[20]; ape:String[20]; dnis:Longword; fecha:Longword);
 			begin
 				with P do
 				begin
 					Nombres:= nom;
 					Apellido:= ape;
 					DNI:= dnis;
-					with FechaNac do
+					FechaNac:=fecha;
+				end;
+			end;
+			
+			Procedure Modificar(var a:ctlPersonas; nom:String[20]; ape:String[20]; dni:Longword; fecha:Longword; var exito:boolean);
+			var
+				i, tamanio, inicio:Word;
+				cont, c:Longword;
+				termino:boolean;
+			begin
+				Recuperar(a, dni, exito);
+				if (exito) then // si no se encontro la persona a modificar exito=false
+				begin		
+					Empaquetar(a);
+					tamanio:= a.lpe;   //tamaño en bytes del original
+					CrearPersona(a.p, nom, ape, dni, fecha);
+					Empaquetar(a);
+					a.ib:=a.ib-SizeOf(dni);
+					if(a.lpe<=tamanio) then 
 					begin
-						dia:=fecnac_dia;
-						mes:=fecnac_mes;
-						ano:=fecnac_ano;
+						Move(a.pe[1],a.b[a.ib],a.lpe); 
+						if(a.lpe<tamanio) then //si es igual no se debe hacer ningun corrimiento en el bloque
+						begin
+							i:=a.ib+a.lpe; //i se pone desde el ultimo lugar copiado, es decir desde 
+							while(a.b[i]<> FIN_BLOQUE) do
+							begin
+								a.b[i]:= a.b[i+tamanio-a.lpe];
+								i:= i+1;
+							end;
+						end;
+						Seek(a.arch, (FilePos(a.arch)-1)); // posiciona a.arch en el lugar a rescribir el bloque
+						BlockWrite(a.arch, a.b, 1); 
+						Seek(a.libres, FilePos(a.arch)-1); // posiciona el archivo libres en la posicion del bloque actual para modificar el espacio libre
+						read(a.libres, a.libre);
+						Seek(a.libres, (FilePos(a.libres)-1));
+						write(a.libres, (a.libre+(tamanio-a.lpe)));
+					end
+					else // si es mayor el corrimiento debe ser al reves
+					begin
+						//controlar que no se exceda el tamaño del bloque
+						Seek(a.libre, FilePos(a.arch)-1);
+						read(a.libres,a.libre);
+						if(a.libre >= (tamanio-a.lpe)) then //entra en el bloque
+						begin
+							//hacer el corrimiento
+							c:=a.lpe-tamanio; // saca la cantidad de veces a correr 1 posicion cada campo
+							aux:=a.ib+tamanio-1;
+							i:= aux;
+							while(a.b[i]<> FIN_BLOQUE) do
+								i:=i+1;
+							while(i <> aux) do
+							begin
+								a.b[i+c]:=a.b[i];
+								i:=i-1;
+							end;
+							Move(a.pe[1],a.b[a.ib],a.lpe); 
+							Seek(a.arch, (FilePos(a.arch)-1)); // posiciona a.arch en el lugar a rescribir el bloque
+							BlockWrite(a.arch, a.b, 1);
+							Seek(a.libres, (FilePos(a.arch)-1)); // posiciona el archivo libres en la posicion del bloque actual para modificar el espacio libre (-1 ya que con el blockwrite paso a la siguiente posicion)
+							read(a.libres, a.libre);
+							Seek(a.libres, (FilePos(a.libres)-1));
+							write(a.libres, (a.libre+(a.lpe-tamanio))); //como a.lpe-tamanio<0 en realidad pasa de ser una suma a ser una resta (suma de numero negativo)
+						end
+						else //no entra en el bloque por lo tanto hay que correr en otro u otros bloques
+							exito:=false;
 					end;
 				end;
 			end;
 			
-			Procedure Modificar(var a:ctlPersonas; nom:String[20]; ape:String[20]; dni:Longword; fecnac_dia:Longword; fecnac_mes:Longword; fecnac_ano:Longword; var exito:boolean);
-			var
-				x, tamanio:word;
-			begin
-				tamanio:=0;
-				Recuperar(a, dni, exito);
-				Empaquetar(a);
-				tamanio:= a.lpe;
-				if (exito) then
-				begin		
-					CrearPersona(a.p, nom, ape, dni, fecnac_dia, fecnac_mes, fecnac_ano);
-					Empaquetar(a);
-					if(a.lpe<=tamanio) then
-					begin
-						longitudaborrar:= SizeOf(nom)+SizeOf(ape)+SizeOf(fecnac_dia)+SizeOf(fecnac_mes)+SizeOf(fecnac_ano);
-						Move(a.pe[a.lpe-longitudaborrar-1],a.b[a.ib],a.lpe-SizeOf(dni);
-					end
-					else
-						exito:= false; // informar en el programa principal que no se pudo modificar porque el registro a agregar era mas grande que el anterior
-				end;
-			end;
-			
-			
 			// Leandro
-			procedure Primero (var a : ctlPersonas ; var exito : boolean);
+			Procedure Primero (var a : ctlPersonas ; var exito : boolean);
 			var
 				i : word;
 				sx : string;
@@ -445,10 +457,7 @@ IMPLEMENTATION
 				end
 				else exito := false;
 			end;
-			
-
-			
-			
+	
 			// Bianca
 			Function HayEspacio(n:ctlPersonas):boolean;
 			var
@@ -501,5 +510,69 @@ IMPLEMENTATION
 				end; 
 				close(a.arch);
 				close(n.arch); 
+			end;
+				
+			Procedure Siguiente (var a : ctlPersonas ; var exito : boolean);
+			var
+				i : word;
+				sx : string;
+			begin
+				while(a.b[a.ib] <> FIN_REGISTRO) do a.ib:=a.ib+1;
+				a.ib:=a.ib+1;
+				if (a.ib <> FIN_BLOQUE) then
+				begin
+					i:=a.ib;
+					while (a.b[a.ib] <> FIN_CAMPO) do
+						a.ib := a.ib + 1;
+					Move (a.b[i] , sx[1] , a.ib - i);
+					Val (sx , a.p.DNI);
+					a.ib := a.ib +1;
+					i := a.ib;
+					while (a.b[a.ib] <> FIN_CAMPO) do
+						a.ib := a.ib + 1;
+					Move (a.b[i] , a.p.Apellido[1], a.ib - i);
+					a.ib := a.ib + 1;
+					i := a.ib;
+					while (a.b[a.ib] <> FIN_CAMPO) do
+						a.ib := a.ib + 1;
+					Move (a.b[i] , a.p.Nombres[1] , a.ib - i);
+					a.ib := a.ib + 1;
+					i := a.ib;
+					while (a.b[a.ib] <> FIN_REGISTRO) do
+						a.ib := a.ib + 1;
+					Move (a.b[i] , sx[1] , a.ib - i);
+					Val (sx , a.p.FechaNac);
+					exito := true;
+				end
+				else begin
+					if (not EoF(a.arch)) then
+					begin
+						BlockRead(a.arch, a.b, 1);
+						a.ib:=1;
+						i:=a.ib;
+						while (a.b[a.ib] <> FIN_CAMPO) do
+							a.ib := a.ib + 1;
+						Move (a.b[i] , sx[1] , a.ib - i);
+						Val (sx , a.p.DNI);
+						a.ib := a.ib +1;
+						i := a.ib;
+						while (a.b[a.ib] <> FIN_CAMPO) do
+							a.ib := a.ib + 1;
+						Move (a.b[i] , a.p.Apellido[1], a.ib - i);
+						a.ib := a.ib + 1;
+						i := a.ib;
+						while (a.b[a.ib] <> FIN_CAMPO) do
+							a.ib := a.ib + 1;
+						Move (a.b[i] , a.p.Nombres[1] , a.ib - i);
+						a.ib := a.ib + 1;
+						i := a.ib;
+						while (a.b[a.ib] <> FIN_REGISTRO) do
+							a.ib := a.ib + 1;
+						Move (a.b[i] , sx[1] , a.ib - i);
+						Val (sx , a.p.FechaNac);
+						exito := true;
+					end
+					else exito:=false;
+				end;
 			end;
 End.
