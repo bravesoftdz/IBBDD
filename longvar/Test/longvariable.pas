@@ -179,35 +179,6 @@ IMPLEMENTATION
                    write(a.libres,a.libre);
               end;
               
-			Procedure Insertar (var a:ctlPersonas; var exito:boolean);
-			var
-				fin: boolean;
-			Begin
-				Seek(a.libres,0);
-				Empaquetar(a);
-				fin:= false;
-				while ((not fin) and (not EoF(a.libres))) do
-				begin
-					read(a.libres, a.libre);
-					if (a.libre >= a.lpe) then
-					begin
-						fin:= true;
-						Seek(a.libres,(FilePos(a.libres)-1));
-					end;
-				end;
-				if (fin) then
-				begin
-					Seek(a.arch, FilePos(a.libres));
-					BlockRead(a.arch, a.b, 1);
-					Move(a.pe[1], a.b[LongBloque-a.libre], a.lpe);
-					a.b[LongBloque-a.libre+a.lpe]:=Ord(FIN_BLOQUE); //LongBloque-act+a.lpe+1??
-					a.libre:= a.libre-a.lpe;
-					write(a.libres,a.libre);
-				end
-				else	Cargar(a);
-				exito:= true;
-				End;
-              
 				Procedure Exportar(var a:ctlPersonas; var nue:Text; nom:String);
 				Var
 					i:word;
@@ -230,12 +201,14 @@ IMPLEMENTATION
 							i := a.ib;
 							while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 								a.ib := a.ib + 1;
+							a.p.Apellido:=Chr(a.ib-i);
 							Move (a.b[i] , a.p.Apellido[1], a.ib - i);
 							output:=output + 'Apellido: ' + a.p.Apellido + ' ';
 							a.ib := a.ib + 1;
 							i := a.ib;
 							while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 								a.ib := a.ib + 1;
+							a.p.Nombres:=Chr(a.ib-i);
 							Move (a.b[i] , a.p.Nombres[1] , a.ib - i);
 							output:= output + 'Nombres: ' + a.p.Nombres + ' ';
 							a.ib := a.ib + 1;
@@ -309,12 +282,17 @@ IMPLEMENTATION
               begin
 				b:=false;
 				Str(dni, sx);
-				while ((not EOF(a.arch)) and (not b)) do begin					// recorre el archivo buscando el bloque que contiene 'dni'
+				Seek(a.arch, 0);
+				while ((not EoF(a.arch)) and (not b)) do begin					// recorre el archivo buscando el bloque que contiene 'dni'
 					BlockRead(a.arch, a.b, 1);
 					a.ib:=1;
 					while ((a.b[a.ib] <> Ord(FIN_BLOQUE)) and (not b)) do begin			// recorre el bloque buscando un dni igual
 						i:=1;
+						writeln('a.ib:= ', a.ib, '  i:= ', i);//
+						writeln('a.b[a.ib]:= ', a.b[a.ib], '  sx[i]:= ', Ord(sx[i]));//
 						while ((a.b[a.ib] <> Ord(FIN_CAMPO)) and (a.b[a.ib] = Ord(sx[i]))) do begin   // realiza la comparacion
+							writeln('a.ib:= ', a.ib, '  i:= ', i);//
+							writeln('a.b[a.ib]:= ', Chr(a.b[a.ib]), '  sx[i]:= ', sx[i]);//
 							i:=i+1;
 							a.ib:=a.ib+1;
 						end;
@@ -335,6 +313,7 @@ IMPLEMENTATION
 						a.ib:=a.ib+1;
 						t:=t+1;
 					end;
+					a.p.Apellido[0]:=Chr(t);
 					Move(a.b[i], a.p.Apellido[1], t);
 					a.ib:=a.ib+1;
 					i:=a.ib;
@@ -343,6 +322,7 @@ IMPLEMENTATION
 						a.ib:=a.ib+1;
 						t:=t+1;
 					end;
+					a.p.Nombres[0]:=Chr(t);
 					Move(a.b[i], a.p.Nombres[1], t);
 					a.ib:=a.ib+1;
 					i:=a.ib;
@@ -387,6 +367,36 @@ IMPLEMENTATION
 				CrearPersona(A.p, nombre, apellido, dni, fecha);
 			end;
 			
+			Procedure Insertar (var a:ctlPersonas; var exito:boolean);
+			var
+				fin: boolean;
+			Begin
+				Seek(a.libres,0);
+				CargarPersona(a);
+				Empaquetar(a);
+				fin:= false;
+				while ((not fin) and (not EoF(a.libres))) do
+				begin
+					read(a.libres, a.libre);
+					if (a.libre >= a.lpe) then
+					begin
+						fin:= true;
+						Seek(a.libres,(FilePos(a.libres)-1));
+					end;
+				end;
+				if (fin) then
+				begin
+					Seek(a.arch, FilePos(a.libres));
+					BlockRead(a.arch, a.b, 1);
+					Move(a.pe[1], a.b[LongBloque-a.libre], a.lpe);
+					a.b[LongBloque-a.libre+a.lpe]:=Ord(FIN_BLOQUE); //LongBloque-act+a.lpe+1??
+					a.libre:= a.libre-a.lpe;
+					write(a.libres,a.libre);
+				end
+				else	Cargar(a);
+				exito:= true;
+				End;
+			
 			  Procedure Cargar(var a:ctlPersonas);
               begin
                    if (a.estado <> LE) then    a.estado:= LE;
@@ -429,7 +439,9 @@ IMPLEMENTATION
 					tamanio:= a.lpe;   //tamaño en bytes del original
 					CrearPersona(a.p, nom, ape, dni, fecha);
 					Empaquetar(a);
-					a.ib:=a.ib-SizeOf(dni);
+					//a.ib:=a.ib-SizeOf(dni);
+					while((a.ib>0) and (a.b[a.ib] <> Ord(FIN_REGISTRO))) do a.ib:=a.ib-1;
+					a.ib:=a.ib+1;
 					if(a.lpe<=tamanio) then 
 					begin
 						Move(a.pe[1],a.b[a.ib],a.lpe); 
@@ -457,12 +469,12 @@ IMPLEMENTATION
 						if(a.libre >= (tamanio-a.lpe)) then //entra en el bloque
 						begin
 							//hacer el corrimiento
-							c:=a.lpe-tamanio; // saca la cantidad de veces a correr 1 posicion cada campo
-							aux:=a.ib+tamanio-1;
+							c:=a.lpe-tamanio+1; // c es cantidad de espacio que hay q hacer el corrimiento
+							aux:=a.ib+tamanio;  //se para al comienzo del siguiente registro
 							i:= aux;
 							while(a.b[i]<> Ord(FIN_BLOQUE)) do
 								i:=i+1;
-							while(i <> aux) do
+							while(i >= aux) do
 							begin
 								a.b[i+c]:=a.b[i];
 								i:=i-1;
