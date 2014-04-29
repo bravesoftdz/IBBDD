@@ -13,8 +13,8 @@ INTERFACE
              tEstado = (C, E, LE);
              tPersona = Record
                       DNI: Longword;
-                      Apellido: String[20];
-                      Nombres: String[20];
+                      Apellido: String;
+                      Nombres: String;
                       FechaNac: Longword;
              end;
              ctlPersonas = Record
@@ -182,47 +182,54 @@ IMPLEMENTATION
 				Procedure Exportar(var a:ctlPersonas; var nue:Text; nom:String);
 				Var
 					i:word;
-					output, sx:String;
+					output, sx, ape, nomb, fecnac:String;
 				Begin
 					assign(nue, nom);
 					Rewrite(nue);
 					Seek(a.arch, 0);
-					while (not EoF(a.arch)) do begin
+					while (not EoF(a.arch)) do
+                    begin
 						BlockRead(a.arch, a.b, 1);
 						a.ib:=1;
 						i:=a.ib;
-						while(a.b[a.ib] <> Ord(FIN_BLOQUE)) do begin
+						while(a.b[a.ib] <> Ord(FIN_BLOQUE)) do
+                        begin
 							while(a.b[a.ib] <> Ord(FIN_CAMPO)) do 
 								a.ib:=a.ib+1;
+							sx[0]:= Chr(a.ib-i);
 							Move (a.b[i] , sx[1] , a.ib - i);
-							Val (sx , a.p.DNI);
-							output:= 'DNI: ' + IntToStr(a.p.DNI) + ' ';
+							Val(sx, a.p.DNI);
+							//output:= 'DNI: ' +IntToStr(Consultar_dni(a.p))+ ' ';
 							a.ib := a.ib +1;
 							i := a.ib;
 							while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 								a.ib := a.ib + 1;
-							a.p.Apellido:=Chr(a.ib-i);
+							a.p.Apellido[0]:=Chr(a.ib-i);
 							Move (a.b[i] , a.p.Apellido[1], a.ib - i);
-							output:=output + 'Apellido: ' + a.p.Apellido + ' ';
+							Consultar_apellido(ape, a.p);
+							//output:= output + 'Apellido: ' + ape + ' ';
 							a.ib := a.ib + 1;
 							i := a.ib;
 							while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 								a.ib := a.ib + 1;
-							a.p.Nombres:=Chr(a.ib-i);
+							a.p.Nombres[0]:=Chr(a.ib-i);
 							Move (a.b[i] , a.p.Nombres[1] , a.ib - i);
-							output:= output + 'Nombres: ' + a.p.Nombres + ' ';
+							Consultar_nombre(nomb, a.p);
+							//output:= output + 'Nombres: ' + nomb + ' ';
 							a.ib := a.ib + 1;
 							i := a.ib;
 							while (a.b[a.ib] <> Ord(FIN_REGISTRO)) do
 								a.ib := a.ib + 1;
-							Move (a.b[i] , sx[1] , a.ib - i);
-							Val (sx , a.p.FechaNac);
-							output := output + 'Fecha de Nacimiento: ' + IntToStr(a.p.FechaNac) + '.';
+							fecnac[0]:= Chr(a.ib-i);
+							Move (a.b[i] , fecnac[1] , a.ib - i);
+							Val(fecnac, a.p.FechaNac);
+							output:= 'DNI: '+IntToStr(Consultar_dni(a.p))+' Apellido: '+ape+' Nombre: '+nomb+' Fecha de Nacimiento: ' +IntToStr(Consultar_fecha(a.p))+'.';
 							writeln(nue, output);
 							a.ib := a.ib+1;
 							i := a.ib;
 						end;
 					end;
+                      Close(nue);
 				End;
               
               //Ramiro
@@ -234,6 +241,7 @@ IMPLEMENTATION
               begin
 				b:=false;
 				Str(dni, sx);
+				Seek(a.arch, 0);
 				while ((not EOF(a.arch)) and (not b)) do begin					// recorre el archivo buscando el bloque que contiene 'dni'
 					BlockRead(a.arch, a.b, 1);
 					a.ib:=1;
@@ -252,7 +260,7 @@ IMPLEMENTATION
 				end;
 				if (b) then begin
 					act:=a.ib;					// 'act' es el indice de las posiciones a reacomodar
-					a.ib:=a.ib-Length(sx)-1;		// 'a.ib' es el indice de la posicion donde empieza el registro a eliminar
+					a.ib:=a.ib-Length(sx);		// 'a.ib' es el indice de la posicion donde empieza el registro a eliminar
 					repeat act:=act+1; until (a.b[act] = Ord(FIN_REGISTRO));
 					act:=act+1;
 					{
@@ -263,6 +271,7 @@ IMPLEMENTATION
 					* } 
 					Move (a.b[act], a.b[a.ib], LongBloque-act+1);			// se realiza el corrimiento solapando el registro a borrar
 					act:=act-a.ib;
+					Seek(a.arch, FilePos(a.arch)-1);
 					BlockWrite(a.arch, a.b, 1);					// se escribe la modificacion en el archivo
 					seek(a.libres, FilePos(a.arch)-1);
 					read(a.libres, a.libre);
@@ -283,16 +292,12 @@ IMPLEMENTATION
 				b:=false;
 				Str(dni, sx);
 				Seek(a.arch, 0);
-				while ((not EoF(a.arch)) and (not b)) do begin					// recorre el archivo buscando el bloque que contiene 'dni'
+				while ((not EOF(a.arch)) and (not b)) do begin					// recorre el archivo buscando el bloque que contiene 'dni'
 					BlockRead(a.arch, a.b, 1);
 					a.ib:=1;
 					while ((a.b[a.ib] <> Ord(FIN_BLOQUE)) and (not b)) do begin			// recorre el bloque buscando un dni igual
 						i:=1;
-						writeln('a.ib:= ', a.ib, '  i:= ', i);//
-						writeln('a.b[a.ib]:= ', a.b[a.ib], '  sx[i]:= ', Ord(sx[i]));//
 						while ((a.b[a.ib] <> Ord(FIN_CAMPO)) and (a.b[a.ib] = Ord(sx[i]))) do begin   // realiza la comparacion
-							writeln('a.ib:= ', a.ib, '  i:= ', i);//
-							writeln('a.b[a.ib]:= ', Chr(a.b[a.ib]), '  sx[i]:= ', sx[i]);//
 							i:=i+1;
 							a.ib:=a.ib+1;
 						end;
@@ -303,7 +308,7 @@ IMPLEMENTATION
 						end;
 					end;
 				end;
-				checkpointer:= a.ib;
+				checkpointer:= a.ib;   //checkpointer esta en FIN_CAMPO despues del dni del registro buscado (Ej. 42)
 				if (b) then begin
 					a.p.DNI:=dni;
 					a.ib:=a.ib+1;
@@ -331,6 +336,7 @@ IMPLEMENTATION
 						a.ib:=a.ib+1;
 						t:=t+1;
 					end;
+					sx[0]:= Chr(t);
 					Move(a.b[i], sx[1], t);
 					Val(sx, a.p.FechaNac);
 					a.ib:= checkpointer;
@@ -378,18 +384,17 @@ IMPLEMENTATION
 				while ((not fin) and (not EoF(a.libres))) do
 				begin
 					read(a.libres, a.libre);
-					if (a.libre >= a.lpe) then
-					begin
-						fin:= true;
-						Seek(a.libres,(FilePos(a.libres)-1));
-					end;
+					if (a.libre >= a.lpe) then fin:= true;
 				end;
 				if (fin) then
 				begin
-					Seek(a.arch, FilePos(a.libres));
+					Seek(a.arch, FilePos(a.libres)-1);
 					BlockRead(a.arch, a.b, 1);
-					Move(a.pe[1], a.b[LongBloque-a.libre], a.lpe);
-					a.b[LongBloque-a.libre+a.lpe]:=Ord(FIN_BLOQUE); //LongBloque-act+a.lpe+1??
+					a.ib:=1;
+					while(a.b[a.ib] <> Ord(FIN_BLOQUE)) do a.ib:=a.ib+1;
+					Move(a.pe[1], a.b[a.ib], a.lpe);
+					a.b[a.ib+a.lpe]:= Ord(FIN_BLOQUE);
+					Seek(a.libres,(FilePos(a.libres)-1)); 
 					a.libre:= a.libre-a.lpe;
 					write(a.libres,a.libre);
 				end
@@ -405,7 +410,7 @@ IMPLEMENTATION
 						CargarPersona(a);
 						Empaquetar(a);
 						Move(a.pe[1], a.b[1], a.lpe);
-						a.b[a.lpe+1]:=Ord(FIN_BLOQUE);
+						a.b[a.lpe]:=Ord(FIN_BLOQUE);
 						BlockWrite(a.arch, a.b, 1);
 						Seek(a.libres, 0);
 						a.libre:= LongBloque-a.lpe-1;
@@ -448,11 +453,11 @@ IMPLEMENTATION
 						if(a.lpe<tamanio) then //si es igual no se debe hacer ningun corrimiento en el bloque
 						begin
 							i:=a.ib+a.lpe; //i se pone desde el ultimo lugar copiado, es decir desde 
-							while(a.b[i]<> Ord(FIN_BLOQUE)) do
-							begin
-								a.b[i]:= a.b[i+tamanio-a.lpe];
+							repeat
+								a.b[i]:= a.b[i+tamanio-a.lpe+1];
 								i:= i+1;
-							end;
+							until(a.b[i+tamanio-a.lpe+1] = Ord(FIN_BLOQUE));
+							a.b[i]:= Ord(FIN_BLOQUE);
 						end;
 						Seek(a.arch, (FilePos(a.arch)-1)); // posiciona a.arch en el lugar a rescribir el bloque
 						BlockWrite(a.arch, a.b, 1); 
@@ -466,10 +471,13 @@ IMPLEMENTATION
 						//controlar que no se exceda el tamaño del bloque
 						Seek(a.libres, FilePos(a.arch)-1);
 						read(a.libres,a.libre);
-						if(a.libre >= (tamanio-a.lpe)) then //entra en el bloque
+						if(a.libre >= (a.lpe-tamanio)) then //entra en el bloque
 						begin
 							//hacer el corrimiento
-							c:=a.lpe-tamanio+1; // c es cantidad de espacio que hay q hacer el corrimiento
+							Eliminar(a, dni, exito);
+							while(a.b[a.ib] <> Ord(FIN_BLOQUE)) do a.ib:=a.ib+1;
+							
+							{ c:=a.lpe-tamanio+1; // c es cantidad de espacio que hay q hacer el corrimiento
 							aux:=a.ib+tamanio;  //se para al comienzo del siguiente registro
 							i:= aux;
 							while(a.b[i]<> Ord(FIN_BLOQUE)) do
@@ -478,14 +486,16 @@ IMPLEMENTATION
 							begin
 								a.b[i+c]:=a.b[i];
 								i:=i-1;
-							end;
+							end;}
 							Move(a.pe[1],a.b[a.ib],a.lpe); 
+							a.ib:=a.ib+a.lpe;
+							a.b[a.ib]:= Ord(FIN_BLOQUE);
 							Seek(a.arch, (FilePos(a.arch)-1)); // posiciona a.arch en el lugar a rescribir el bloque
 							BlockWrite(a.arch, a.b, 1);
 							Seek(a.libres, (FilePos(a.arch)-1)); // posiciona el archivo libres en la posicion del bloque actual para modificar el espacio libre (-1 ya que con el blockwrite paso a la siguiente posicion)
 							read(a.libres, a.libre);
 							Seek(a.libres, (FilePos(a.libres)-1));
-							write(a.libres, (a.libre+(a.lpe-tamanio))); //como a.lpe-tamanio<0 en realidad pasa de ser una suma a ser una resta (suma de numero negativo)
+							write(a.libres, (a.libre-(a.lpe-tamanio))); //como a.lpe-tamanio<0 en realidad pasa de ser una suma a ser una resta (suma de numero negativo)
 						end
 						else //no entra en el bloque por lo tanto hay que correr en otro u otros bloques
 							exito:=false;
@@ -502,27 +512,31 @@ IMPLEMENTATION
 				a.estado := LE;
 				Seek (a.arch,0);
 				a.ib:=1;
-				if (not eof(a.arch)) then begin
+				if (not EoF(a.arch)) then begin
 					BlockRead(a.arch,a.b,1);
 					i := a.ib;
 					while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 						a.ib := a.ib + 1;
+					sx[0]:=Chr(a.ib-i);
 					Move (a.b[i] , sx[1] , a.ib - i);
 					Val (sx , a.p.DNI);
 					a.ib := a.ib +1;
 					i := a.ib;
 					while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 						a.ib := a.ib + 1;
+					a.p.Apellido[0]:= Chr(a.ib-i);
 					Move (a.b[i] , a.p.Apellido[1], a.ib - i);
 					a.ib := a.ib + 1;
 					i := a.ib;
 					while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 						a.ib := a.ib + 1;
+					a.p.Nombres[0]:= Chr(a.ib-i);
 					Move (a.b[i] , a.p.Nombres[1] , a.ib - i);
 					a.ib := a.ib + 1;
 					i := a.ib;
 					while (a.b[a.ib] <> Ord(FIN_REGISTRO)) do
 						a.ib := a.ib + 1;
+					sx[0]:= Chr(a.ib-i);
 					Move (a.b[i] , sx[1] , a.ib - i);
 					Val (sx , a.p.FechaNac);
 					exito := true;
@@ -537,27 +551,31 @@ IMPLEMENTATION
 			begin
 				while(a.b[a.ib] <> Ord(FIN_REGISTRO)) do a.ib:=a.ib+1;
 				a.ib:=a.ib+1;
-				if (a.ib <> Ord(FIN_BLOQUE)) then
+				if (a.b[a.ib] <> Ord(FIN_BLOQUE)) then
 				begin
 					i:=a.ib;
 					while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 						a.ib := a.ib + 1;
+					sx[0]:=Chr(a.ib-i);
 					Move (a.b[i] , sx[1] , a.ib - i);
 					Val (sx , a.p.DNI);
 					a.ib := a.ib +1;
 					i := a.ib;
 					while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 						a.ib := a.ib + 1;
+					a.p.Apellido[0]:= Chr(a.ib-i);
 					Move (a.b[i] , a.p.Apellido[1], a.ib - i);
 					a.ib := a.ib + 1;
 					i := a.ib;
 					while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 						a.ib := a.ib + 1;
+					a.p.Nombres[0]:= Chr(a.ib-i);
 					Move (a.b[i] , a.p.Nombres[1] , a.ib - i);
 					a.ib := a.ib + 1;
 					i := a.ib;
 					while (a.b[a.ib] <> Ord(FIN_REGISTRO)) do
 						a.ib := a.ib + 1;
+					sx[0]:=Chr(a.ib-i);
 					Move (a.b[i] , sx[1] , a.ib - i);
 					Val (sx , a.p.FechaNac);
 					exito := true;
@@ -570,22 +588,26 @@ IMPLEMENTATION
 						i:=a.ib;
 						while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 							a.ib := a.ib + 1;
+						sx[0]:=Chr(a.ib-i);
 						Move (a.b[i] , sx[1] , a.ib - i);
 						Val (sx , a.p.DNI);
 						a.ib := a.ib +1;
 						i := a.ib;
 						while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 							a.ib := a.ib + 1;
+						a.p.Apellido[0]:= Chr(a.ib-i);
 						Move (a.b[i] , a.p.Apellido[1], a.ib - i);
 						a.ib := a.ib + 1;
 						i := a.ib;
 						while (a.b[a.ib] <> Ord(FIN_CAMPO)) do
 							a.ib := a.ib + 1;
+						a.p.Nombres[0]:= Chr(a.ib-i);
 						Move (a.b[i] , a.p.Nombres[1] , a.ib - i);
 						a.ib := a.ib + 1;
 						i := a.ib;
 						while (a.b[a.ib] <> Ord(FIN_REGISTRO)) do
 							a.ib := a.ib + 1;
+						sx[0]:=Chr(a.ib-i);
 						Move (a.b[i] , sx[1] , a.ib - i);
 						Val (sx , a.p.FechaNac);
 						exito := true;
